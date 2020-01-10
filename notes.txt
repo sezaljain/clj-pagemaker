@@ -1,0 +1,211 @@
+oledump.py ------------------------------------------
+def dump_rec_content(doc,model,iter,level,file):
+    ntype=model.get_value(iter,1)
+    if ntype == 0:
+        return
+    size = model.get_value(iter,2)
+    data = model.get_value(iter,3)
+    if size==0:
+        return
+    tmpDoc=App.Page()
+    tmpDoc.version=doc.version
+    done=False
+    if doc.appdoc != None:
+        try:
+            doc.appdoc.update_view2(tmpDoc,model,iter)
+            done=True
+        except:
+            pass
+    if done:
+        pass
+    elif ntype[0] == "fh":
+        if ntype[1] in fh.hdp:
+            fh.hdp[ntype[1]](tmpDoc,data,doc)
+    elif ntype[0] == "fh12":
+        if ntype[1] in fh12.fh12_ids:
+            fh12.fh12_ids[ntype[1]](tmpDoc,size,data,ntype[1])
+    tmpModel=tmpDoc.model
+    tmpIter = tmpModel.get_iter_first()
+    if tmpIter == None:
+        return
+    prefix=' '*level
+    prefix+="%s:"%ntype[1]
+    i=0
+    text=""
+    while tmpIter != None:
+        text+="%s=\"%s\","%(tmpModel.get_value(tmpIter,0),tmpModel.get_value(tmpIter,1))
+        tmpIter = tmpModel.iter_next(tmpIter)
+        if len(text)>80:
+            file.write("%s%s%s\n"%(prefix,"" if i==0 else "[_%d]"%i,text))
+            i+=1
+            text=""
+    if len(text):
+        file.write("%s%s%s\n"%(prefix,"" if i==0 else "[_%d]"%i,text))
+
+def dump_rec(doc,model,iter,level,file):
+    prefix=' '*level
+    suffix=""
+    if model.get_value(iter,2)>2000:
+        suffix=binascii.hexlify(model.get_value(iter,3)[0:2000])
+        suffix+="...[+%dbytes]"%(model.get_value(iter,2)-2000)
+    else:
+        suffix=binascii.hexlify(model.get_value(iter,3))
+    type=model.get_value(iter,1)[1]
+    for i in range((len(suffix)+199)//200):
+        file.write("%s%s:%s%s\n"%(prefix,type,"" if i==0 else "[_%d]"%i,suffix[i*200:(i+1)*200]))
+    if model.get_value(iter,2):
+        try:
+            dump_rec_content(doc,model,iter,level,file)
+        except:
+            pass
+    for i in range(model.iter_n_children(iter)):
+        dump_rec(doc,model,model.iter_nth_child(iter,i),level+1,file)
+
+def dump(doc,model,file):
+    iter = model.get_iter_first()
+    if iter == None:
+        print("can not find any iter")
+        return
+    while iter != None:
+        dump_rec(doc,model,iter,1,file)
+        iter = model.iter_next(iter)
+
+def main():
+    if len(sys.argv)!=3:
+        print("Unexpected Number of arguments.")
+        print("Syntax: oledump.py inputFile outputFile")
+        return
+    try:
+        fs=open(sys.argv[1],"rb")
+    except:
+        print("can not open %s"%sys.argv[1])
+        return
+    buf = fs.read()
+    if buf:
+        doc=App.Page()
+        p
+        if doc.fload(buf)==0:
+            model=doc.view.get_model()
+            try:
+                output=open(sys.argv[2],"w")
+            except:
+                print("can not open output %s"%sys.argv[2])
+                return
+            dump(doc,model,output)
+            output.close()
+        else:
+            print("can not read the file")
+    else:
+        print("can not retrieve the file content")
+    fs.close()
+
+App.py -- > class page ------------------------------------------
+class Page:
+	def __init__(self):
+		self.parent = None
+		self.type = ''
+		self.subtype = None # used by IWA
+		self.fname = ''
+		self.pname = ''
+		self.items = ''
+		self.version = 0
+		self.context = None # an arbitrary object; can be used to pass file-specific data to callbacks
+		self.hd = None
+		self.hpaned = None
+		self.dict = None
+		self.dictmod = None
+		self.dictview = None
+		self.dictwin = None
+		self.search = None
+		self.wdoc = None  # need to store 'WordDocument' stream
+		self.wtable = None # need to store 'xTable' stream of ms-doc; use for CDRs map of dat-files IDs to names
+		self.wdata = None # need to store 'Data' stream; use for CDR to store iters of "dat" files
+		self.model, self.view, self.scrolled = tree.make_view() #None, None, None
+		self.win = None # for preview
+		self.debug = 0
+		self.appdoc = None
+		self.backpath = None
+		self.cdr18 = False
+
+def fload(self,buf="",parent=None,package=None):
+		self.pname = os.path.split(self.fname)[1]
+		f = None
+		if buf == "":
+			offset = 0
+			f = open(self.fname,"rb")
+			buf = f.read()
+		if buf[0:8] == "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+			self.type = ole.ole_open(buf, self, parent)
+			return 0
+
+
+
+
+
+
+
+ole.py------------------------------------------
+
+
+def ole_open (buf,page,iter=None):
+	print('Open as OLE')
+	if iter:
+		print(page.model.get_value(iter,0))
+	else:
+		print()
+	return my_open(buf,page,iter)
+
+def my_open (buf,page,parent=None):
+	dircache = {}
+	vbaiter = None
+	docdata = ""
+	docdataiter = None
+	tbliter = None
+	dirflag=0
+	ftype = ""
+	tmpfile = None
+	try:
+		if parent is None:
+			gsffilename = page.fname
+		else:
+			# need to save tmp file to pass to gsf
+			(tmpfd, tmpfile) = mkstemp()
+			gsffilename = tmpfile
+			os.write(tmpfd, buf)
+			os.close(tmpfd)
+		gsfout = subprocess.check_output(["gsf", "list", gsffilename])
+		print(gsfout)
+		print("-----------------")
+		for i in gsfout.split("\n")[1:-1]:
+			if i[0] == "f":
+				# gsf sometimes lists date even for files. Or, rather, it
+				# seems that it misrepresents empty dirs as (empty) files.
+				# I have observed this with 'Objects' in many .pub files.
+				if i[5] != ' ':
+					fullname = " ".join(i.split()[4:])
+				else:
+					fullname = " ".join(i.split()[2:])
+				if not len(fullname):
+					fullname = " ".join(i.split()[2:])
+				if "/" in fullname:
+					fns = fullname.split("/")
+					cdir = "/".join(fns[:-1])
+					fn = fns[-1]
+				else:
+					fn = fullname
+					cdir = ""
+				if len(fn) and ord(fn[0]) < 32: 
+					fn = fn[1:]
+				if cdir:
+					cdir_to_treeiter(page,parent,cdir,dircache)
+					pn = dircache["/"+cdir]
+				else:
+					pn = parent
+				data = subprocess.check_output(["gsf", "cat", gsffilename, fullname])
+				iter1 = add_pgiter(page,fn,"ole",fn,data,pn)
+
+				if fn == "PageMaker":
+					ftype = "pm"
+					page.model.set_value(iter1,1,("pm",dirflag))
+					pm6.open (page, data, iter1)
+				return ftype
