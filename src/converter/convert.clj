@@ -25,18 +25,30 @@
    false
    0))
 
-(def records; (second result)
-  (map parse/add-type-detail (second result))
-  )
+
+(reset! (:records file) (map parse/add-type-detail (second result)))
+(swap! (:parsed-data file) merge
+       {:fonts (map #(parse/parse-records file %) (parse/get-records-of-type file 0x13))})
+(swap! (:parsed-data file) merge
+       {:colors (map #(parse/parse-records file %) (parse/get-records-of-type file 0x15))})
+
+(swap! (:parsed-data file) merge {:global-info
+                                  (parse/parse-record
+                                   file
+                                   (first (parse/get-records-of-type file 0x18)))})
+(swap! (:parsed-data file) merge {:pages
+                                  (map
+                                   #(parse/parse-records file %)
+                                   (parse/get-records-of-type file 0x05))})
+
+(parse/parse-record file (first (parse/get-records-of-type file 0x19)))
+
+#_(swap! (:parsed-data file) merge {:shapes
+                                    (map
+                                     #(parse/parse-records file %)
+                                     (parse/get-records-of-type file 0x19))})
                                         ;(prn (parse/add-type-detail records))
-(def file-info
-  {:header      @(:header file)
-   :fonts       (parse/parse-fonts file records)
-   :colors      (parse/parse-colors file records)
-   :global-info (parse/parse-record
-                 file
-                 (first (parse/get-records-of-type records 0x18)))})
 
-(prn file-info)
-
+#_(parse/parse-records file (first (parse/get-records-of-type records 0x05)))
 ;;parse fonts, colors, xforms, global info, loop through pages
+#_(parse/parse-records file (first (parse/get-records-of-type records 0x19)))

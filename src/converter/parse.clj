@@ -31,8 +31,8 @@
     (map #(int (* 255 (min 1.0 (/ (+ % k) max-u16)))) [c m y]))
   )
 
-(defn get-records-of-type [records type]
-  (filter #(= (:rec-type %) type) records))
+(defn get-records-of-type [input type]
+  (filter #(= (:rec-type %) type) @(:records input)))
 
 (defn get-expandend-records [record]
   (let [rec-to-copy record]
@@ -41,11 +41,11 @@
           (assoc :num-recs 1)
           (assoc :offset  (+ (:offset record) (* i (-> (:rec-type record) con/pmd-rec-types :size))))))))
 
-(defn get-expanded-records-of-type [type]
-  (map get-expandend-records (get-records-of-type type)))
+(defn get-expanded-records-of-type [input type]
+  (map get-expandend-records (get-records-of-type input type)))
 
-(defn get-records-of-seq-nos [records seq-nos]
-  (filter #(not= -1 (.indexOf seq-nos (:seq %))) records))
+(defn get-records-of-seq-nos [input seq-nos]
+  (filter #(not= -1 (.indexOf seq-nos (:seq %))) @(:records input)))
 
 (defn parse-dims [input offset]
   (let [dims [(pm6/unpack input offset :short) (pm6/unpack input (+ 2 offset) :short)]]
@@ -130,9 +130,8 @@
 (defmethod parse-record 0x05 [input record]
   ;; parsing pages
   (let [offset  (:offset record)
-        seq-num (pm6/unpack input (+ 8 offset) :short)]
-    (prn "to parse shape " seq-num))
-  )
+        seq-num (pm6/unpack input (+ 2 offset) :short)]
+    seq-num))
 
 
 (defmethod parse-record 0x0d [input record]
@@ -179,13 +178,15 @@
      :rule-above     (parse-rule input (+ 44 offset))
      :rule-below     (parse-rule input (+ 62 offset))})
   )
-
+(defmethod parse-record 0x0c [input record]
+  (prn "txt styles need to be parsed"))
 
 (defmethod parse-record 0x1a [input record]
   ;; parsing a text block
   (let [offset                   (:offset record)
         text-block-id            (pm6/unpack input (+ 0x20 offset) :int)
         text-box-related-records (pm6/unpack input (+ 0x24 offset) :short 6)]
+    (prn "related" text-box-related-records)
     (reduce
      (fn [acc rec]
        (assoc
@@ -193,7 +194,13 @@
         (:rec-type-name rec)
         (parse-records input rec)))
      {}
-     (get-records-of-seq-nos text-box-related-records))))
+     (get-records-of-seq-nos input text-box-related-records))))
+
+(defmethod parse-record 0x09 [input record]
+  (prn "txt props need to be parsed"))
+
+(defmethod parse-record 0x1b [input record]
+  (prn "txt props b need to be parsed"))
 
 (defmethod parse-record 0x28 [input record]
   ;;parsing an xform
@@ -210,10 +217,16 @@
     (pm6/unpack input (:offset record) :char)))
 
 (defmethod parse-shape 0x01 [input record]
+  (prn "parse text box")
   ;;parsing a text box shape
   (let [offset             (:offset record)
         text-box-block-id  (pm6/unpack input (+ 32 offset) :char)
-        text-block-records (flatten (get-expanded-records-of-type 0x1a))]
+        text-block-records (flatten (get-expanded-records-of-type input 0x1a))]
+    (prn text-box-block-id)
+    (prn (filter
+          #(= text-box-block-id
+              (pm6/unpack input (+ 32 (:offset %)) :int))
+          text-block-records))
     (parse-record
      input
      (first
@@ -223,6 +236,7 @@
        text-block-records)))))
 
 (defmethod parse-shape 0x03 [input record]
+  (prn "parse line")
   ;;parse line shape
   (let [offset     (:offset record)
         mirror-var (pm6/unpack input (+ 38 offset) :short)]
@@ -289,7 +303,7 @@
      :bbox
      {:top-left     (parse-dims input (+ 6 offset))
       :bottom-right (parse-dims input (+ 10 offset))}
-     :points (map #(parse-dims input (:offset %)) (get-records-of-seq-nos line-set-seq-nums))
+     :points (map #(parse-dims input (:offset %)) (get-records-of-seq-nos input line-set-seq-nums))
      :closed (not= 1 (pm6/unpack input (+ 56 offset) :char))
      :stroke-props
      {:type       (pm6/unpack input (+ 32 offset) :char)
@@ -301,6 +315,7 @@
 
 (defmethod parse-record 0x19 [input record]
   ;;parse shapes
+  (prn "parsing shapes")
   (assoc
    {:xform-id   (pm6/unpack input (+ 28 (:offset record)) :int)
     :shape-name (con/shape-record-types (pm6/unpack input (:offset record) :char))}
@@ -309,22 +324,8 @@
 
 
 (defn parse-records [input record]
+  (prn "parsing records" record)
   (if (= 0x0d (:rec-type record))
     (parse-record input record)
     (for [i (range (:num-recs record))]
       (parse-record input (update record :offset + (* i (-> (:rec-type record) con/pmd-rec-types :size)))))))
-
-
-(defn parse-fonts [input records]
-  (for [font-rec (get-records-of-type (flatten records) 0x13)]
-    (parse-record input font-rec)))
-
-(defn parse-colors [input records]
-  (for [color-rec (get-records-of-type records 0x15)]
-    (parse-records input color-rec)))
-
-
-
-
-;; 2 figure out the final output tree this is going into
-;; time to fix the sequence no of things
