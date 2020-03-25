@@ -31,17 +31,27 @@
        {:fonts (map #(parse/parse-records file %) (parse/get-records-of-type file 0x13))})
 (swap! (:parsed-data file) merge
        {:colors (map #(parse/parse-records file %) (parse/get-records-of-type file 0x15))})
+;;parse xforms?
+(swap! (:parsed-data file) merge
+       {:xforms (map #(parse/parse-records file %) (parse/get-records-of-type file 0x28))})
 
 (swap! (:parsed-data file) merge {:global-info
                                   (parse/parse-record
                                    file
                                    (first (parse/get-records-of-type file 0x18)))})
-(swap! (:parsed-data file) merge {:pages
-                                  (map
-                                   #(parse/parse-records file %)
-                                   (parse/get-records-of-type file 0x05))})
+#_(swap! (:parsed-data file) merge {:pages
+                                    (map
+                                     #(parse/parse-records file %)
+                                     (parse/get-records-of-type file 0x05))})
+(prn  "--------------------------")
+(swap!
+ (:parsed-data file)
+ merge
+ {:shapes (map #(parse/parse-records file %) (parse/get-records-of-type file 0x19))})
+(prn "---------------------------")
 
-(parse/parse-record file (first (parse/get-records-of-type file 0x19)))
+
+#_(prn (map #(parse/parse-record file %) (parse/get-records-of-seq-nos file [61 62 63 64 65 66 67])))
 
 #_(swap! (:parsed-data file) merge {:shapes
                                     (map

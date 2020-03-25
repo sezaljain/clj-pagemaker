@@ -5,20 +5,6 @@
    :toc-length-offset 0x2e
    :endian-marker     (byte-array [0x99 0xff])})
 
-
-;; 0x0f:("WMF ?", 1),
-;; 0x10:("0x10", 332),
-;; 0x11:("0x11", 4),
-;; 0x12:("0x12", 298), # FIXME!
-;; 0x1f:("0x1f", 62),
-;; 0x21:("0x21", 32), # FIXME!
-;; 0x25:("0x25", 562),
-;; 0x29:("0x29", 1),  # two dwords of str lengths, than two strings
-;; 0x2a:("0x2a", 192), # FIXME!
-;; 0x2d:("0x2a", 192), # FIXME!
-;; 0x2e:("0x2e", 1),
-
-
 (def pmd-rec-types {0x01 {:name :font-parent :size 10}
                     0x04 {:name :print-opts :size 104}
                     0x05 {:name :page :size 472}
@@ -47,12 +33,14 @@
                       0x18 :rgb})
 
 (def shape-record-types {0x01 :text
+                         0x02 :image
                          0x03 :line
                          0x04 :rectangle
                          0x05 :ellipse
                          0x06 :bitmap
                          0x0a :metafile
-                         0x0c :polygon})
+                         0x0c :polygon
+                         0x0e :group})
 
 #_(def shape-record-types {:text      0x01
                            :line      0x03

@@ -2,7 +2,9 @@
   (:require [converter.pagemaker-buffer :as pm6]
             [converter.records :as rec]
             [converter.chanakya :as c]
-            [converter.constants :as con]))
+            [converter.constants :as con]
+            [converter.parse :as parse]
+            [converter.matcher :as matcher]))
 
 
 #_(reset! rec/offset 0)
@@ -44,6 +46,9 @@
 (defn get-expanded-records-of-type [input type]
   (map get-expandend-records (get-records-of-type input type)))
 
+(defn get-records-of-seq-no [input seq-no]
+  (first (filter #(= seq-no (:seq %)) @(:records input))))
+
 (defn get-records-of-seq-nos [input seq-nos]
   (filter #(not= -1 (.indexOf seq-nos (:seq %))) @(:records input)))
 
@@ -80,9 +85,18 @@
   (fn [input record]
     (:rec-type record)))
 
-#_(defmethod parse-record :default [input record]
-    record
-    #_(prn "do nothing" (:rec-type-name record)))
+(defmethod parse-record :default [input record]
+  #_record
+  (prn "do nothing" (:rec-type record) (:rec-type-name record) record))
+
+(defn parse-records [input record]
+  (if (seq? record)
+    (map #(parse-records input %) record)
+    (when (con/pmd-rec-types (:rec-type record))
+      (if (= 0x0d (:rec-type record))
+        (parse-record input record)
+        (for [i (range (:num-recs record))]
+          (parse-record input (update record :offset + (* i (-> (:rec-type record) con/pmd-rec-types :size)))))))))
 
 (defmethod parse-record
   ;; parsing global info
@@ -129,15 +143,18 @@
 
 (defmethod parse-record 0x05 [input record]
   ;; parsing pages
-  (let [offset  (:offset record)
-        seq-num (pm6/unpack input (+ 2 offset) :short)]
-    seq-num))
+  (let [offset   (:offset record)
+        seq-num  (pm6/unpack input (+ 2 offset) :short)]
+    (parse/parse-record
+     input
+     (first (parse/get-records-of-seq-nos input [seq-num])))))
 
 
 (defmethod parse-record 0x0d [input record]
   ;;parse text
-  (clojure.string/join
-   (map char (pm6/unpack input (:offset record) :char  (:num-recs record)))))
+  (->>  (pm6/unpack input (:offset record) :char  (:num-recs record))
+        (map char)
+        clojure.string/join))
 
 
 (defmethod parse-record 0x1c [input record]
@@ -179,22 +196,23 @@
      :rule-below     (parse-rule input (+ 62 offset))})
   )
 (defmethod parse-record 0x0c [input record]
-  (prn "txt styles need to be parsed"))
+  ;;  (prn "txt styles need to be parsed")
+  "txt styles needs to be parsed"
+  )
 
 (defmethod parse-record 0x1a [input record]
   ;; parsing a text block
-  (let [offset                   (:offset record)
-        text-block-id            (pm6/unpack input (+ 0x20 offset) :int)
-        text-box-related-records (pm6/unpack input (+ 0x24 offset) :short 6)]
-    (prn "related" text-box-related-records)
-    (reduce
-     (fn [acc rec]
-       (assoc
-        acc
-        (:rec-type-name rec)
-        (parse-records input rec)))
-     {}
-     (get-records-of-seq-nos input text-box-related-records))))
+  ;;         matcher/chanakya-to-unicode
+  (let [offset          (:offset record)
+        text-box-text   (pm6/unpack input (+ 4 offset) :short)
+        related-records (get-records-of-seq-nos input (pm6/unpack input offset :short 6))
+        parsed-records  (reduce
+                         (fn [acc rec]
+                           (assoc
+                            acc
+                            (:rec-type-name rec)
+                            (parse-records input rec))) {} related-records)]
+    parsed-records))
 
 (defmethod parse-record 0x09 [input record]
   (prn "txt props need to be parsed"))
@@ -212,28 +230,37 @@
      :rotating-point  (parse-dims input (+ 18 offset))
      :id              (pm6/unpack input (+ 22 offset) :int)}))
 
+(defmethod parse-record 0x2f [input record]
+  ;;parsing master
+  )
+
+(defmethod parse-record 0x31 [input record]
+  ;;parsing layer
+  (let [offset  (:offset record)
+        layerid (pm6/unpack input (+ 42 offset) :int)]
+    {:layer-id layerid}))
+
 (defmulti parse-shape
   (fn [input record]
     (pm6/unpack input (:offset record) :char)))
 
+(defmethod parse-shape :default [input record]
+  (prn "no shape found of this id" (pm6/unpack input (:offset record) :char)))
+
 (defmethod parse-shape 0x01 [input record]
-  (prn "parse text box")
   ;;parsing a text box shape
-  (let [offset             (:offset record)
-        text-box-block-id  (pm6/unpack input (+ 32 offset) :char)
-        text-block-records (flatten (get-expanded-records-of-type input 0x1a))]
-    (prn text-box-block-id)
-    (prn (filter
-          #(= text-box-block-id
-              (pm6/unpack input (+ 32 (:offset %)) :int))
-          text-block-records))
+  (let [offset                 (:offset record)
+        text-box-text-block-id (pm6/unpack input (+ 32 offset) :char)
+        text-block-records     (flatten (get-expanded-records-of-type input 0x1a))
+        text-block-record      (first (filter
+                                       #(= text-box-text-block-id
+                                           (pm6/unpack input (+ 32 (:offset %)) :int))
+                                       text-block-records))]
+    (prn "text block id" text-box-text-block-id)
+    (prn "text block record" text-block-record)
     (parse-record
      input
-     (first
-      (filter
-       #(= text-box-block-id
-           (pm6/unpack input (+ 32 (:offset %)) :int))
-       text-block-records)))))
+     text-block-record)))
 
 (defmethod parse-shape 0x03 [input record]
   (prn "parse line")
@@ -291,6 +318,9 @@
 (defmethod parse-shape 0x06 [input record] (prn "this is a bitmap"))
 (defmethod parse-shape 0x0a [input record] (prn "this is a metafile"))
 
+(defmethod parse-shape 0x02 [input record] (prn "this is an image"))
+(defmethod parse-shape 0x0e [input record] (prn "this is a group"))
+
 (defmethod parse-shape 0x0c [input record]
   ;;parse polygon shape
   (let [offset            (:offset record)
@@ -321,11 +351,3 @@
     :shape-name (con/shape-record-types (pm6/unpack input (:offset record) :char))}
    :shape-data
    (parse-shape input record)))
-
-
-(defn parse-records [input record]
-  (prn "parsing records" record)
-  (if (= 0x0d (:rec-type record))
-    (parse-record input record)
-    (for [i (range (:num-recs record))]
-      (parse-record input (update record :offset + (* i (-> (:rec-type record) con/pmd-rec-types :size)))))))

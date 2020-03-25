@@ -145,9 +145,9 @@
          rec-location   rec-loc
          seq-number     seq-num
          records        []]
-    (prn remaining-recs,rec-location, seq-number (count records))
+    ;;    (prn remaining-recs,rec-location, seq-number (count records))
     (if (= 0 remaining-recs)
-      (do (prn "sdf" remaining-recs) [seq-number records])
+      [seq-number records]
       (let [rec-type         (pm6/unpack input (+ 1 rec-location) :unsigned-char)
             num-recs         (pm6/unpack input (+ 2 rec-location) :short)
             offset           (pm6/unpack input (+ 4 rec-location) :int)
@@ -169,7 +169,6 @@
           (and (not is-sub-rec) (= 1 rec-type)) (let
                                                     [[sq-num rec] (read-next-record-toc
                                                                    input offset num-recs seq-number true sub-type)]
-                                                  #_(swap! seq-no inc)
                                                   (recur
                                                    (dec remaining-recs)
                                                    new-rec-location
