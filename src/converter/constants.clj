@@ -13,7 +13,7 @@
                     0x0c {:name :txt-styles :size 164}
                     0x0d {:name :txt :size 1}
                     0x0e {:name :tiff :size 1}
-                    0x10 {:name :dont-know :size nil}
+                    ;; 0x10 {:name :dont-know :size nil}
                     0x11 {:name :line-set :size 4}
                     0x13 {:name :fonts :size 94}
                     0x14 {:name :styles :size 334}

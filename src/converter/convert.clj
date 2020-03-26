@@ -26,28 +26,29 @@
    0))
 
 
-(reset! (:records file) (map parse/add-type-detail (second result)))
-(swap! (:parsed-data file) merge
-       {:fonts (map #(parse/parse-records file %) (parse/get-records-of-type file 0x13))})
-(swap! (:parsed-data file) merge
-       {:colors (map #(parse/parse-records file %) (parse/get-records-of-type file 0x15))})
+(reset! (:records file) (map parse/add-type-detail (flatten (second result))))
+(def parsed (map #(assoc % :parsed-data (parse/parse-records file %)) @(:records file)))
+#_(swap! (:parsed-data file) merge
+         {:fonts (map #(parse/parse-records file %) (parse/get-records-of-type file 0x13))})
+#_(swap! (:parsed-data file) merge
+         {:colors (map #(parse/parse-records file %) (parse/get-records-of-type file 0x15))})
 ;;parse xforms?
-(swap! (:parsed-data file) merge
-       {:xforms (map #(parse/parse-records file %) (parse/get-records-of-type file 0x28))})
+#_(swap! (:parsed-data file) merge
+         {:xforms (map #(parse/parse-records file %) (parse/get-records-of-type file 0x28))})
 
-(swap! (:parsed-data file) merge {:global-info
-                                  (parse/parse-record
-                                   file
-                                   (first (parse/get-records-of-type file 0x18)))})
+#_(swap! (:parsed-data file) merge {:global-info
+                                    (parse/parse-record
+                                     file
+                                     (first (parse/get-records-of-type file 0x18)))})
 #_(swap! (:parsed-data file) merge {:pages
                                     (map
                                      #(parse/parse-records file %)
                                      (parse/get-records-of-type file 0x05))})
 (prn  "--------------------------")
-(swap!
- (:parsed-data file)
- merge
- {:shapes (map #(parse/parse-records file %) (parse/get-records-of-type file 0x19))})
+#_(swap!
+   (:parsed-data file)
+   merge
+   {:shapes (map #(parse/parse-records file %) (parse/get-records-of-type file 0x19))})
 (prn "---------------------------")
 
 

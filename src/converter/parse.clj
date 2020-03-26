@@ -85,9 +85,7 @@
   (fn [input record]
     (:rec-type record)))
 
-(defmethod parse-record :default [input record]
-  #_record
-  (prn "do nothing" (:rec-type record) (:rec-type-name record) record))
+(defmethod parse-record :default [input record])
 
 (defn parse-records [input record]
   (if (seq? record)
@@ -95,8 +93,10 @@
     (when (con/pmd-rec-types (:rec-type record))
       (if (= 0x0d (:rec-type record))
         (parse-record input record)
-        (for [i (range (:num-recs record))]
-          (parse-record input (update record :offset + (* i (-> (:rec-type record) con/pmd-rec-types :size)))))))))
+        (remove
+         nil?
+         (for [i (range (:num-recs record))]
+           (parse-record input (update record :offset + (* i (-> (:rec-type record) con/pmd-rec-types :size))))))))))
 
 (defmethod parse-record
   ;; parsing global info
@@ -143,11 +143,9 @@
 
 (defmethod parse-record 0x05 [input record]
   ;; parsing pages
-  (let [offset   (:offset record)
-        seq-num  (pm6/unpack input (+ 2 offset) :short)]
-    (parse/parse-record
-     input
-     (first (parse/get-records-of-seq-nos input [seq-num])))))
+  (let [offset  (:offset record)
+        seq-num (pm6/unpack input (+ 2 offset) :short)]
+    {:related-records [seq-num]}))
 
 
 (defmethod parse-record 0x0d [input record]
@@ -195,30 +193,19 @@
      :rule-above     (parse-rule input (+ 44 offset))
      :rule-below     (parse-rule input (+ 62 offset))})
   )
-(defmethod parse-record 0x0c [input record]
-  ;;  (prn "txt styles need to be parsed")
-  "txt styles needs to be parsed"
-  )
+(defmethod parse-record 0x0c [input record])
 
 (defmethod parse-record 0x1a [input record]
   ;; parsing a text block
   ;;         matcher/chanakya-to-unicode
   (let [offset          (:offset record)
         text-box-text   (pm6/unpack input (+ 4 offset) :short)
-        related-records (get-records-of-seq-nos input (pm6/unpack input offset :short 6))
-        parsed-records  (reduce
-                         (fn [acc rec]
-                           (assoc
-                            acc
-                            (:rec-type-name rec)
-                            (parse-records input rec))) {} related-records)]
-    parsed-records))
+        related-records (pm6/unpack input offset :short 6)]
+    {:related-records related-records}))
 
-(defmethod parse-record 0x09 [input record]
-  (prn "txt props need to be parsed"))
+(defmethod parse-record 0x09 [input record])
 
-(defmethod parse-record 0x1b [input record]
-  (prn "txt props b need to be parsed"))
+(defmethod parse-record 0x1b [input record])
 
 (defmethod parse-record 0x28 [input record]
   ;;parsing an xform
@@ -244,8 +231,7 @@
   (fn [input record]
     (pm6/unpack input (:offset record) :char)))
 
-(defmethod parse-shape :default [input record]
-  (prn "no shape found of this id" (pm6/unpack input (:offset record) :char)))
+(defmethod parse-shape :default [input record])
 
 (defmethod parse-shape 0x01 [input record]
   ;;parsing a text box shape
@@ -256,14 +242,10 @@
                                        #(= text-box-text-block-id
                                            (pm6/unpack input (+ 32 (:offset %)) :int))
                                        text-block-records))]
-    (prn "text block id" text-box-text-block-id)
-    (prn "text block record" text-block-record)
-    (parse-record
-     input
-     text-block-record)))
+    {:related-records (:seq text-block-record)} ;;TODO should it be :text-block-record instead?
+    ))
 
 (defmethod parse-shape 0x03 [input record]
-  (prn "parse line")
   ;;parse line shape
   (let [offset     (:offset record)
         mirror-var (pm6/unpack input (+ 38 offset) :short)]
@@ -315,11 +297,11 @@
       :tint       (pm6/unpack input (+ 44 offset) :char)}}))
 
 
-(defmethod parse-shape 0x06 [input record] (prn "this is a bitmap"))
-(defmethod parse-shape 0x0a [input record] (prn "this is a metafile"))
+(defmethod parse-shape 0x06 [input record])
+(defmethod parse-shape 0x0a [input record])
 
-(defmethod parse-shape 0x02 [input record] (prn "this is an image"))
-(defmethod parse-shape 0x0e [input record] (prn "this is a group"))
+(defmethod parse-shape 0x02 [input record])
+(defmethod parse-shape 0x0e [input record])
 
 (defmethod parse-shape 0x0c [input record]
   ;;parse polygon shape
@@ -345,9 +327,12 @@
 
 (defmethod parse-record 0x19 [input record]
   ;;parse shapes
-  (prn "parsing shapes")
   (assoc
    {:xform-id   (pm6/unpack input (+ 28 (:offset record)) :int)
     :shape-name (con/shape-record-types (pm6/unpack input (:offset record) :char))}
    :shape-data
    (parse-shape input record)))
+
+
+
+;;some issue with seq numbers
