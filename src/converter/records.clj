@@ -56,7 +56,7 @@
                                                    (inc sq-num)
                                                    (conj records rec)))
           (and (not is-sub-rec) (= 0 rec-type)) (let [[sq-num rec] (read-next-record-toc
-                                                                    input offset num-recs false 0)]
+                                                                    input offset num-recs seq-number false 0)]
                                                   (recur
                                                    (dec remaining-recs)
                                                    new-rec-location

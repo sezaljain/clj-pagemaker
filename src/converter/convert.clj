@@ -1,7 +1,9 @@
 (ns converter.convert
   (:require [converter.records :as rec]
             [converter.pagemaker-buffer :as pm6]
-            [converter.parse :as parse]))
+            [converter.parse :as parse]
+            [converter.matcher :as matcher]
+            [converter.construct :as construct]))
 
 
 (def file {:filename    "../Sezal.p65"
@@ -11,7 +13,8 @@
            :offset      (atom 0)
            :seq-no      (atom 0)
            :records     (atom [])
-           :parsed-data (atom {})})
+           :parsed-data (atom {})
+           :markdown    (atom "")})
 
 
 (rec/parse-header file)
@@ -28,38 +31,13 @@
 
 (reset! (:records file) (map parse/add-type-detail (flatten (second result))))
 (def parsed (map #(assoc % :parsed-data (parse/parse-records file %)) @(:records file)))
-#_(swap! (:parsed-data file) merge
-         {:fonts (map #(parse/parse-records file %) (parse/get-records-of-type file 0x13))})
-#_(swap! (:parsed-data file) merge
-         {:colors (map #(parse/parse-records file %) (parse/get-records-of-type file 0x15))})
-;;parse xforms?
-#_(swap! (:parsed-data file) merge
-         {:xforms (map #(parse/parse-records file %) (parse/get-records-of-type file 0x28))})
+(def text-data  (construct/construct-document parsed))
+#_(def text {:txt            (map :txt text-data)
+             :formatted-text (clojure.string/join (map :formatted-text text-data))})
 
-#_(swap! (:parsed-data file) merge {:global-info
-                                    (parse/parse-record
-                                     file
-                                     (first (parse/get-records-of-type file 0x18)))})
-#_(swap! (:parsed-data file) merge {:pages
-                                    (map
-                                     #(parse/parse-records file %)
-                                     (parse/get-records-of-type file 0x05))})
+(def dd (map :formatted-text text-data))
 (prn  "--------------------------")
-#_(swap!
-   (:parsed-data file)
-   merge
-   {:shapes (map #(parse/parse-records file %) (parse/get-records-of-type file 0x19))})
-(prn "---------------------------")
-
-
-#_(prn (map #(parse/parse-record file %) (parse/get-records-of-seq-nos file [61 62 63 64 65 66 67])))
-
-#_(swap! (:parsed-data file) merge {:shapes
-                                    (map
-                                     #(parse/parse-records file %)
-                                     (parse/get-records-of-type file 0x19))})
-                                        ;(prn (parse/add-type-detail records))
-
-#_(parse/parse-records file (first (parse/get-records-of-type records 0x05)))
-;;parse fonts, colors, xforms, global info, loop through pages
-#_(parse/parse-records file (first (parse/get-records-of-type records 0x19)))
+(prn dd)
+(prn "--------------------------------------------")
+;;(def ddd (reduce (fn [acc v] (clojure.string/join "<br>" [acc  (:formatted-text v)])) "" text-data))
+(prn (clojure.string/join dd))
