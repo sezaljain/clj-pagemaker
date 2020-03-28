@@ -8,7 +8,9 @@
                    :symbols            [["Ï" "।"]
                                         ["Ñ" "‘"]
                                         ["Ò" "’"]
-                                        ["" "—"]]
+                                        ["" "—"]
+                                        ["\r" "\n  "]
+                                        ["\t" ""]]
                    :matra              [["åï" "ो"]
                                         ["ó" "ो"]
                                         ["ô" "ौ"]
@@ -385,3 +387,19 @@
 
 (defn chanakya-to-unicode [text]
   (decipher-string text chanakya-key))
+
+(def symbols [["²" "\n- "]
+              ["¶" "\n  - "]
+              ["\t" ""]
+              ["\r" "\n  "]])
+
+(defn add-symbols
+  ([text symbols-key]
+   (if (empty? symbols-key)
+     text
+     (let [k (first symbols-key)]
+       (add-symbols
+        (s/replace text (re-pattern (first k)) (last k))
+        (rest symbols-key)))))
+  ([text]
+   (add-symbols text symbols)))

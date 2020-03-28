@@ -1,12 +1,8 @@
 (ns converter.construct
-  (:require [converter.matcher :refer [chanakya-to-unicode]]
+  (:require [converter.matcher :refer [chanakya-to-unicode add-symbols]]
             [clojure.string :as s]))
 
 ;; takes in parsed records and constructs a markdown formatted text out of it.
-
-
-
-
 
 (defn filter-by-rec-type [record-data rec-type]
   (filter
@@ -21,6 +17,12 @@
      (:seq %))
    record-data))
 
+(defn remove-extra-chars [text extra-chars]
+  (if (empty? extra-chars)
+    text
+    (remove-extra-chars
+     (s/replace text (re-pattern (first extra-chars)) "")
+     (rest extra-chars))))
 ;; :underline
 ;; :tint
 ;; :strike
@@ -32,30 +34,50 @@
 ;; :italic
 ;; :sub-pos
 ;; :super-pos
+(defn add-tag
+  ([text tag props]
+   (let [tag-start (s/replace tag #">" (s/join [(reduce (fn [acc [k v]] (str " " k "=" v " ")) "" props) ">"]))
+         tag-close (s/replace tag #"<" "</")]
+     (str tag-start text tag-close)))
+  ([text tag]
+   (let [tag-close (s/replace tag #"<" "</")]
+     (str tag text tag-close))))
 
-(defn add-tag [text tag]
-  ;;; assumes tag is <sdfasfasf>
-  (let [tag-close (s/replace tag #"<" "</")]
-    (str tag text tag-close)))
+(defn add-tag- [txt tag]
+  (if (= "-" (s/trim txt))
+    txt
+    (str tag (s/trim txt) tag " ")))
 
-#_(defn remove-adjoining-tags [text tags]
-    (reduce
-     (fn [acc tag]
-       (let [pattern (str (s/replace tag #"<" "</") tag)]
-         (prn pattern)
-         (s/replace text (re-pattern pattern) "")))
-     text tags))
+(defn add-heading [txt font-size font]
+  (cond
+    (and (= font "Chanakya") (= 220 font-size))        (str "\n# " txt)
+    (and (= font "Times New Roman") (= 180 font-size)) (str "\n# " txt)
+    (and (= font "Chanakya") (= 180 font-size))        (str "\n## " txt)
+    (and (= font "Chanakya") (= 160 font-size))        (str "\n### " txt)
+    :else                                              txt))
 
-(defn markdown [txt {:keys [font-face font-color font-size bold italic sub super underline]}]
-  (cond-> txt
-    (= 0 font-face) (chanakya-to-unicode)
-    (= 1 bold)      (add-tag "<b>")
-    (= 1 italic)    (add-tag "<i>")
-    (= 1 sub)       (add-tag "<sub>")
-    (= 1 super)     (add-tag "<sup>")
-    (= 1 underline) (add-tag "<u>")
-    ;;   :always         (remove-adjoining-tags ["<b>" "<i>" "<sub>" "<sup>" "<u>"])
-    ))
+(defn markdown [txt {:keys [font font-face font-color font-size bold italic sub super underline]}]
+  (if (= 0 (count (s/trim txt)))
+    txt
+    (cond-> txt
+      (= "Chanakya" font)    (chanakya-to-unicode)
+      (= "Wingdings 2" font) (add-symbols)
+      (= 1 bold)             (add-tag- "**")
+      (= 1 italic)           (add-tag- "_")
+      (= 1 sub)              (add-tag "<sub>")
+      (= 1 super)            (add-tag "<sup>")
+      (= 1 underline)        (add-tag "<u>")
+      font-size              (add-heading font-size font)
+      #_                     (add-tag "<font>" {"size" (Math/floor (/ font-size 25))})
+      #_:always              #_ (remove-extra-chars ["" "" "" "" "" "" "****"]))))
+
+(defn para-format [txt {:keys [align left-indent after-indent before-indent right-indent first-indent rule-below rule-above orphans widows keep-with-next hyphen-count hyphenate length] :as v}]
+  (if (= 0 (count txt))
+    txt
+    (cond-> txt
+      #_      (= 2 align) #_ (add-tag "<center>")
+      :always (str "\n  "))))
+
 
 (defn construct-text-data [text-related-records]
   (let [grouped-records (->> text-related-records
@@ -71,66 +93,75 @@
             (flatten grouped-data)))))
      {} grouped-records)))
 
-(defn apply-char-props [txt-paras char-props-list]
+(defn apply-char-props [txt char-props-list offset]
+  ;;apply char props to a signle para text
   ;;we have txt distributed into paras at this point
-  ;; every para has start index and sub string\
-  (let [chars-with-start-end (reductions
-                              (fn [acc v]
-                                (let [start (or (:end acc) (:length acc))]
-                                  (assoc v :start start :end (+ start (:length v)))))
-                              (assoc (first char-props-list) :start 0 :end (:length (first char-props-list)))
-                              (rest char-props-list))]
-    (map
-     ;;this first map M1 runs a loop over all para props with fn A
-     (fn [para]
-       ;; this is fn A, first we find all relevant char props for a particular para (based on start,end)
-       (let [relevant-chars (filter #(and (< (:start %) (:end para)) (> (:end %) (:start para))) chars-with-start-end)]
-         {:char-text (add-tag
-                      (reduce
-                       ;;this reduce R1 loops over relevant chars and applies markdown based on char props to txt
-                       (fn [acc v]
-                         (let [start (- (max (:start v) (:start para)) (:start para))
-                               end   (- (min (:end v) (:end para)) (:start para))]
-                           (clojure.string/join [acc (markdown (subs (:txt para) start end) v)])))
-                       ""
-                       relevant-chars)
-                      "<p>")} ))
-     txt-paras)))
-
-(defn apply-para-props [txt para-props-list]
+  ;; every para has start index and sub string
   (reduce
+   ;;this reduce R1 loops over relevant chars and applies markdown based on char props to txt
    (fn [acc v]
-     (let [start (or (:end (last acc)) 0)
-           end   (+ start (:length v))]
-       (merge acc {:txt   (subs txt start end)
-                   :start start
-                   :end   end})))
+     (let [start (- (max (:start v) offset) offset)
+           end   (- (min (:end v) (+ offset (count txt))) offset)]
+       (clojure.string/join [acc (markdown (subs txt start end) v)])))
+   ""
+   char-props-list))
+
+(defn apply-para-char-props [txt para-props-list char-props-list]
+  (reduce
+   (fn [acc para]
+     (let [relevant-chars (filter #(and (< (:start %) (:end para)) (> (:end %) (:start para))) char-props-list)
+           sub-txt        (subs txt (:start para) (:end para))]
+       ;; (when (> 3 (:length para)) (prn para sub-txt) "==================")
+       (merge acc {:txt (-> sub-txt
+                            (apply-char-props relevant-chars (:start para))
+                            (para-format para))})))
    []
    para-props-list))
 
 
 (defn debug [x] (prn (first x)) x)
 
-(defn construct-html-text [data text-related-records]
+(defn remove-duplicates [prop-list]
+  (reduce
+   (fn [acc v]
+     (let [last-v  (last acc)
+           is-same (= (dissoc last-v :length) (dissoc v :length))]
+       #_(if is-same (prn "found same " v)
+             (prn last-v v))
+       (if is-same
+         (assoc acc (dec (count acc)) (assoc last-v :length (+ (:length last-v) (:length v))))
+         (merge acc v))))
+   []
+   prop-list))
+
+(defn add-start-end [prop-list]
+  (reductions
+   (fn [acc v]
+     (let [start (or (:end acc) (:length acc))]
+       (assoc v :start start :end (+ start (:length v)))))
+   (assoc (first prop-list) :start 0 :end (:length (first prop-list)))
+   (rest prop-list)))
+
+(defn construct-html-text [data fonts text-related-records]
   (let [records                  (filter-by-seq-num data text-related-records)
         {:keys [txt para chars]} (construct-text-data records)
-        transformed-data         (-> (apply-para-props txt para)
-                                     (apply-char-props chars))]
-    {:formatted-text (clojure.string/join (map :char-text transformed-data))
+        chars-with-start-end     (remove-duplicates (map #(assoc % :font (nth fonts (:font-face %))) (add-start-end chars)))
+        para-with-start-end      (add-start-end para)
+        transformed-data         (apply-para-char-props txt para-with-start-end chars-with-start-end)]
+    #_    (prn (filter #(> 3 (:length %)) para-with-start-end) "================")
+    #_(prn (set (map #(select-keys % [:font :font-face :font-size]) chars-with-start-end)))
+    {:formatted-text (clojure.string/join (map :txt transformed-data))
      :txt            txt}))
 
-(defn construct-text-block [data {:keys [parsed-data]}]
-  (prn parsed-data)
-  (map #(construct-html-text data (:related-records %)) parsed-data))
+(defn construct-text-block [data fonts parsed-data]
+  (map #(construct-html-text data fonts (:related-records %)) parsed-data))
 
 (defn construct-document [data]
-  (let [colors      (filter-by-rec-type data :colors)
-        fonts       (filter-by-rec-type data :fonts)
-        global-info (filter-by-rec-type data :global-info)
-        pages       (filter-by-rec-type data :page)
-        text-block  (filter-by-rec-type data :text-block)]
-    (construct-text-block data (first text-block))
+  (let [colors      (map :parsed-data (filter-by-rec-type data :colors))
+        fonts       (flatten (map :parsed-data (filter-by-rec-type data :fonts)))
+        global-info (map :parsed-data (filter-by-rec-type data :global-info))
+        pages       (map :parsed-data (filter-by-rec-type data :page))
+        text-block  (map :parsed-data (filter-by-rec-type data :text-block))]
+    #_    (prn "fonts" (count fonts)  (type fonts) fonts "===============================" )
+    (construct-text-block data fonts (first text-block))
     #_    (map #(construct-text-block data %) text-block)))
-
-
-;;first distribute text into para strings

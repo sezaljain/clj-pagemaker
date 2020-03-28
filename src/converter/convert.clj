@@ -6,7 +6,7 @@
             [converter.construct :as construct]))
 
 
-(def file {:filename    "../Sezal.p65"
+(def file {:filename    "../2.p65"
            :buffer      (pm6/open-gsf "../Sezal.p65")
            :endian      (atom :little)
            :header      (atom {})
@@ -37,7 +37,7 @@
 
 (def dd (map :formatted-text text-data))
 (prn  "--------------------------")
-(prn dd)
+#_(prn dd)
 (prn "--------------------------------------------")
 ;;(def ddd (reduce (fn [acc v] (clojure.string/join "<br>" [acc  (:formatted-text v)])) "" text-data))
-(prn (clojure.string/join dd))
+(print (clojure.string/join dd))
