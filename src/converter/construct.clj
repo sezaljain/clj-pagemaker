@@ -4,6 +4,8 @@
 
 ;; takes in parsed records and constructs a markdown formatted text out of it.
 
+(defn debug [x] (prn x) x)
+
 (defn filter-by-rec-type [record-data rec-type]
   (filter
    #(= rec-type
@@ -69,13 +71,24 @@
       (= 1 underline)        (add-tag "<u>")
       font-size              (add-heading font-size font)
       #_                     (add-tag "<font>" {"size" (Math/floor (/ font-size 25))})
-      #_:always              #_ (remove-extra-chars ["" "" "" "" "" "" "****"]))))
+      :always                (remove-extra-chars ["" "" "" "" "" "" "" "\\*\\*\\*\\*"]))))
+
+#_(defn add-markdown-table
+    ([txt] (add-markdown-table txt "="))
+    ([txt column-separator]
+     (if (> (count (re-seq (re-pattern column-separator) txt)) 1)
+       (s/replace txt (re-pattern column-separator) "|")
+       txt)))
+
+(defn add-markdown-table [txt]
+  (s/join "|" (map s/trim (s/split txt  #"="))))
 
 (defn para-format [txt {:keys [align left-indent after-indent before-indent right-indent first-indent rule-below rule-above orphans widows keep-with-next hyphen-count hyphenate length] :as v}]
   (if (= 0 (count txt))
     txt
     (cond-> txt
-      #_      (= 2 align) #_ (add-tag "<center>")
+      #_      (> (count (re-seq #"=" txt)) 1) #_ (add-markdown-table)
+      #_      (= 2 align)                     #_ (add-tag "<center>")
       :always (str "\n  "))))
 
 
@@ -111,7 +124,6 @@
    (fn [acc para]
      (let [relevant-chars (filter #(and (< (:start %) (:end para)) (> (:end %) (:start para))) char-props-list)
            sub-txt        (subs txt (:start para) (:end para))]
-       ;; (when (> 3 (:length para)) (prn para sub-txt) "==================")
        (merge acc {:txt (-> sub-txt
                             (apply-char-props relevant-chars (:start para))
                             (para-format para))})))
@@ -119,9 +131,8 @@
    para-props-list))
 
 
-(defn debug [x] (prn (first x)) x)
-
 (defn remove-duplicates [prop-list]
+  #_  (prn prop-list "}}}}}")
   (reduce
    (fn [acc v]
      (let [last-v  (last acc)
@@ -145,16 +156,19 @@
 (defn construct-html-text [data fonts text-related-records]
   (let [records                  (filter-by-seq-num data text-related-records)
         {:keys [txt para chars]} (construct-text-data records)
-        chars-with-start-end     (remove-duplicates (map #(assoc % :font (nth fonts (:font-face %))) (add-start-end chars)))
+        txt                      (or txt "")
+        chars-with-start-end     (map #(assoc % :font (nth fonts (:font-face %))) (add-start-end chars))
         para-with-start-end      (add-start-end para)
-        transformed-data         (apply-para-char-props txt para-with-start-end chars-with-start-end)]
-    #_    (prn (filter #(> 3 (:length %)) para-with-start-end) "================")
-    #_(prn (set (map #(select-keys % [:font :font-face :font-size]) chars-with-start-end)))
+        transformed-data         (apply-para-char-props  txt  para-with-start-end chars-with-start-end)]
+    #_(prn transformed-data "=====================")
     {:formatted-text (clojure.string/join (map :txt transformed-data))
      :txt            txt}))
 
 (defn construct-text-block [data fonts parsed-data]
-  (map #(construct-html-text data fonts (:related-records %)) parsed-data))
+  ;;  (prn parsed-data)
+  (if (seq? parsed-data)
+    (map #(construct-text-block data fonts %) parsed-data)
+    (construct-html-text data fonts (:related-records parsed-data))))
 
 (defn construct-document [data]
   (let [colors      (map :parsed-data (filter-by-rec-type data :colors))
@@ -162,6 +176,5 @@
         global-info (map :parsed-data (filter-by-rec-type data :global-info))
         pages       (map :parsed-data (filter-by-rec-type data :page))
         text-block  (map :parsed-data (filter-by-rec-type data :text-block))]
-    #_    (prn "fonts" (count fonts)  (type fonts) fonts "===============================" )
-    (construct-text-block data fonts (first text-block))
+    (map #(construct-text-block data fonts %) (first text-block))
     #_    (map #(construct-text-block data %) text-block)))

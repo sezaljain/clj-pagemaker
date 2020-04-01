@@ -10,7 +10,7 @@
                                         ["Ò" "’"]
                                         ["" "—"]
                                         ["\r" "\n  "]
-                                        ["\t" ""]]
+                                        ["\t" "\t"]]
                    :matra              [["åï" "ो"]
                                         ["ó" "ो"]
                                         ["ô" "ौ"]
@@ -401,5 +401,22 @@
        (add-symbols
         (s/replace text (re-pattern (first k)) (last k))
         (rest symbols-key)))))
-  ([text]
-   (add-symbols text symbols)))
+  ([text]   (add-symbols text symbols)))
+
+;; #{{:font "Times New Roman", :font-face 1, :font-size 180} {:font "Chanakya", :font-face 0, :font-size 220} {:font "Chanakya", :font-face 0, :font-size 180}}
+;; #{{:font "Chanakya", :font-face 0, :font-size 120}}
+;; #{{:font "Times", :font-face 2, :font-size 100} {:font "Chanakya", :font-face 0, :font-size 120} {:font "Chanakya", :font-face 0, :font-size 220}}
+;; #{{:font "Wingdings 2", :font-face 3, :font-size 80} {:font "Chanakya", :font-face 0, :font-size 125}}
+;; #{{:font "Wingdings 2", :font-face 3, :font-size 100} {:font "Chanakya", :font-face 0, :font-size 125}}
+;; #{{:font "Times New Roman", :font-face 1, :font-size 110} {:font "Chanakya", :font-face 0, :font-size 125}}
+;; #{{:font "Wingdings 2", :font-face 3, :font-size 130}}
+;; #{{:font "Wingdings 2", :font-face 3, :font-size 80} {:font "Times New Roman", :font-face 1, :font-size 100} {:font "Wingdings 2", :font-face 3, :font-size 100} {:font "Chanakya", :font-face 0, :font-size 120} {:font "Chanakya", :font-face 0, :font-size 140} {:font "Times New Roman", :font-face 1, :font-size 150} {:font "Wingdings 2", :font-face 3, :font-size 130}}
+;; #{{:font "Calibri", :font-face 4, :font-size 130} {:font "Chanakya", :font-face 0, :font-size 110} {:font "Chanakya", :font-face 0, :font-size 120}}
+;; #{{:font "Chanakya", :font-face 0, :font-size 120}}
+;; #{{:font "Calibri", :font-face 4, :font-size 130} {:font "Chanakya", :font-face 0, :font-size 120}}
+;; #{{:font "Chanakya", :font-face 0, :font-size 120}}
+;; #{{:font "Chanakya", :font-face 0, :font-size 160}}
+;; #{{:font "Chanakya", :font-face 0, :font-size 160}}
+;; #{{:font "Times New Roman", :font-face 1, :font-size 110} {:font "Times New Roman", :font-face 1, :font-size 100} {:font "Wingdings 2", :font-face 3, :font-size 100} {:font "Chanakya", :font-face 0, :font-size 100} {:font "Chanakya", :font-face 0, :font-size 110} {:font "Chanakya", :font-face 0, :font-size 120} {:font "Kundli", :font-face 5, :font-size 130} {:font "Times New Roman", :font-face 1, :font-size 90}}
+;; #{{:font "Wingdings 2", :font-face 3, :font-size 100} {:font "Chanakya", :font-face 0, :font-size 120}}
+;; #{{:font "Symbol", :font-face 6, :font-size 90}}
