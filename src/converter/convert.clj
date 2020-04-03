@@ -3,7 +3,8 @@
             [converter.pagemaker-buffer :as pm6]
             [converter.parse :as parse]
             [converter.matcher :as matcher]
-            [converter.construct :as construct]))
+            [converter.construct :as construct]
+            [converter.pattern.question :as question]))
 
 
 (def file {:filename    "../A.p65"
@@ -35,6 +36,7 @@
 #_(def text {:txt            (map :txt text-data)
              :formatted-text (clojure.string/join (map :formatted-text text-data))})
 
+(def formatted (map question/get-questions (mapv :formatted-text text-data)))
 (def dd (map :formatted-text text-data))
 (prn  "--------------------------")
 
@@ -43,3 +45,4 @@
 (print (clojure.string/join dd))
 0
 1
+(print (clojure.string/join formatted))

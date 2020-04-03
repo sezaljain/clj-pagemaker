@@ -388,8 +388,8 @@
 (defn chanakya-to-unicode [text]
   (decipher-string text chanakya-key))
 
-(def symbols [["²" "\n- "]
-              ["¶" "\n  - "]
+(def symbols [["²" "\n• "]
+              ["¶" "\n  ◦ "]
               ["\t" ""]
               ["\r" "\n  "]])
 
